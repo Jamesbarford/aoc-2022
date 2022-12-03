@@ -22,12 +22,14 @@ static const int my_pick[] = {
 };
 
 int pickWinner(enum Play opponent, enum Play me) {
-    if (opponent == ROCK && me == SCISSORS) {
-        return SCISSORS;
+    if (opponent == me) {
+        return me + 3;
+    } else if (opponent == ROCK && me == SCISSORS) {
+        return me;
     } else if (opponent == SCISSORS && me == PAPER) {
-        return PAPER;
+        return me;
     } else if (opponent == PAPER && me == ROCK) {
-        return ROCK;
+        return me;
     }
     return me + 6;
 }
@@ -56,8 +58,8 @@ int solve(rFile *rf) {
                     return wins;
                 }
                 wins += pickWinner(opponent, me);
-                ptr++;
                 break;
+
             default:
                 break;
         }
@@ -68,7 +70,7 @@ int solve(rFile *rf) {
 }
 
 int main(void) {
-    rFile *rf = rFileRead("./warmup.txt");
+    rFile *rf = rFileRead("./input.txt");
     printf("wins: %d\n", solve(rf));
     rFileRelease(rf);
 }
