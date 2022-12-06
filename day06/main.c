@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../includes/readfile.h"
+#include "../includes/readfile.h"
 
 #define toint(p) ((p)-48)
 #define SLAB_SIZE (1 << 5)
+/* Change K to solve the problem */
+#define K (14)
 
 typedef struct hNode {
     char value;
@@ -124,27 +126,26 @@ void hashsetDelete(hashset *h, char value) {
 int solve(rFile *rf) {
     char *ptr = rf->buf;
     int window_start = 0;
-    int K = 4;
     int iter = 0;
-    char tmp[4] = {'\0'};
+    char tmp[K] = {'\0'};
     hashset *set = hashsetNew();
     int char_count = 0;
 
     while (*ptr != '\n') {
         tmp[char_count++] = *ptr;
         if (iter >= K - 1) {
-            for (int i = 0; i < 4; ++i) {
+            for (int i = 0; i < K; ++i) {
                 hashsetInsert(set, tmp[i]);
             }
             if (set->len == K) {
                 goto out;
             }
-            for (int i = 1; i < 4; ++i) {
+            for (int i = 1; i < K; ++i) {
                 tmp[i - 1] = tmp[i];
             }
             hashsetClear(set);
             ++window_start;
-            char_count = 3;
+            char_count = K - 1;
         }
         ++iter;
         ++ptr;
@@ -153,7 +154,7 @@ int solve(rFile *rf) {
 out:
     hashsetPrint(set);
     hashsetRelease(set);
-    return window_start + 4;
+    return window_start + K;
 }
 
 int main(void) {

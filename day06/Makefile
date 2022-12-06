@@ -1,8 +1,9 @@
 TARGET  := solve.out
 CC      := cc
+# Change K for the challenge
 CFLAGS  := -Wall -Wpedantic -Wextra -O2
-OBJECTS := $(wildcard ../../includes/*.o)
-HEADERS := $(wildcard ../../includes/*.h)
+OBJECTS := $(wildcard ../includes/*.o)
+HEADERS := $(wildcard ../includes/*.h)
 
 all: $(TARGET)
 
