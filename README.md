@@ -8,6 +8,8 @@ The focus is canonically correct answers; making the correct datastructure in `c
 | [3](https://adventofcode.com/2022/day/3) | ⭐️ | ⭐️ |
 | [4](https://adventofcode.com/2022/day/4) | ⭐️ | ⭐️ |
 | [5](https://adventofcode.com/2022/day/5) | ⭐️ | ⭐️ |
+| [6](https://adventofcode.com/2022/day/6) | ⭐️ | ⭐️ |
+| [7](https://adventofcode.com/2022/day/7) | ⭐️ | ⭐️ |
 
 ## Building 🎅🏻
 I am leaning on some things I've built (for reading in a file), which are in the includes folder. This needs to be built first so the solutions can link against it.
