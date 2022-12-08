@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../includes/readfile.h"
-
 enum Play {
     ROCK = 1,
     PAPER = 2,
@@ -34,43 +32,15 @@ int pickWinner(enum Play opponent, enum Play me) {
     return me + 6;
 }
 
-int solve(rFile *rf) {
+int main(void) {
+    FILE *fp = fopen("./input.txt", "r");
+    char buf[10] = {'\0'};
     int wins = 0;
-    char *ptr = rf->buf;
-    enum Play opponent, me;
 
-    while (*ptr != '\0') {
-        switch (*ptr) {
-            case 'A':
-            case 'B':
-            case 'C':
-                opponent = opponent_move[(int)*ptr];
-                break;
-
-            case 'X':
-            case 'Y':
-            case 'Z':
-                me = my_pick[(int)*ptr];
-                break;
-
-            case '\n':
-                if (*(ptr + 1) == '\n') {
-                    return wins;
-                }
-                wins += pickWinner(opponent, me);
-                break;
-
-            default:
-                break;
-        }
-        ptr++;
+    while (fgets(buf, sizeof(buf), fp)) {
+        wins += pickWinner(opponent_move[(int)buf[0]], my_pick[(int)buf[2]]);
     }
 
-    return wins;
-}
-
-int main(void) {
-    rFile *rf = rFileRead("./input.txt");
-    printf("wins: %d\n", solve(rf));
-    rFileRelease(rf);
+    fclose(fp);
+    printf("wins: %d\n", wins);
 }
