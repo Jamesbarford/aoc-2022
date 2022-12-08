@@ -2,39 +2,31 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../includes/readfile.h"
-
-#define toint(p) ((p)-48)
-
-unsigned int solve(rFile *rf) {
-    char *ptr = rf->buf;
-    unsigned int elf_with_most = 0u;
-    unsigned int cur = 0u;
-    unsigned int acc = 0u;
-
-    while (*ptr) {
-        if (*ptr == '\n' && (*(ptr + 1) == '\n' || *(ptr+1) == '\0')) {
-            acc += cur;
-            cur ^= cur;
-            if (acc > elf_with_most) {
-                elf_with_most = acc;
-            }
-            acc ^= acc;
-        } else if (*ptr == '\n') {
-            acc += cur;
-            cur ^= cur;
-        } else {
-            cur = cur * 10 + toint(*ptr);
+long long getmax(long long *arr, int len) {
+    long long m = LLONG_MIN;
+    for (int i = 0; i < len; ++i) {
+        if (arr[i] > m) {
+            m = arr[i];
         }
-        ++ptr;
     }
-
-    return elf_with_most;
+    return m;
 }
 
 int main(void) {
-    rFile *rf = rFileRead("./input.txt");
-    solve(rf);
-    printf("%u\n", solve(rf));
-    rFileRelease(rf);
+    FILE *fp = fopen("./input.txt", "r");
+    char buf[BUFSIZ] = {'\0'};
+    long long mem[BUFSIZ] = {0};
+    int ptr = 0;
+
+    while (fgets(buf, sizeof(buf), fp)) {
+        long long l = strtoll(buf, NULL, 10);
+        if (l == 0) {
+            ++ptr;
+        } else {
+            mem[ptr] += l;
+        }
+    }
+
+    fclose(fp);
+    printf("%llu\n", getmax(mem, ptr));
 }

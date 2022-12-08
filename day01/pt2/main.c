@@ -1,67 +1,61 @@
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../../includes/readfile.h"
-
-#define toint(p) ((p)-48)
-#define ARRAY_SIZE (3)
-static unsigned int top_elves[ARRAY_SIZE] = {0};
-
-int idxOfMin(void) {
-    unsigned int min = UINT_MAX;
-    int idx = -1;
-    
-    for (int i = 0; i < ARRAY_SIZE; ++i) {
-        if (top_elves[i] < min) {
-            min = top_elves[i];
-            idx = i;
-        }
-    }
-
-    return idx;
-}
-
-void addElvesStash(unsigned int calories) {
-    int idx = idxOfMin();
-    if (idx != -1 && top_elves[idx] < calories) {
-        top_elves[idx] = calories;
-    }
-}
-
-unsigned int sumArray(void) {
-    unsigned int acc = 0;
-    for (int i = 0; i < ARRAY_SIZE; ++i) {
-        acc += top_elves[i];
-    }
-    return acc;
-}
-
-unsigned int solve(rFile *rf) {
-    char *ptr = rf->buf;
-    unsigned int cur = 0u;
-    unsigned int acc = 0u;
-
-    while (*ptr) {
-        if (*ptr == '\n' && (*(ptr + 1) == '\n' || *(ptr+1) == '\0')) {
-            acc += cur;
-            addElvesStash(acc);
-            cur ^= cur;
-            acc ^= acc;
-        } else if (*ptr == '\n') {
-            acc += cur;
-            cur ^= cur;
-        } else {
-            cur = cur * 10 + toint(*ptr);
-        }
-        ++ptr;
-    }
-
-    return sumArray();
+void swap(long long *x, long long *y) {
+    long long tmp = *x;
+    *x = *y;
+    *y = tmp;
 }
 
 int main(void) {
-    rFile *rf = rFileRead("./input.txt");
-    printf("%u\n", solve(rf));
-    rFileRelease(rf);
+    FILE *fp = fopen("./input.txt", "r");
+    char buf[BUFSIZ] = {'\0'};
+    long long mem[BUFSIZ] = {0};
+    long long heap[BUFSIZ] = {0};
+    int heapsize = 0;
+    int ptr = 0;
+
+    while (fgets(buf, sizeof(buf), fp)) {
+        long long l = strtoll(buf, NULL, 10);
+        if (l == 0) {
+            heap[++heapsize] = mem[ptr];
+
+            int cur = heapsize;
+            while (cur && heap[cur / 2] < heap[cur]) {
+                int parent = cur / 2;
+                swap(&heap[parent], &heap[cur]);
+                cur = parent;
+            }
+            ++ptr;
+        } else {
+            mem[ptr] += l;
+        }
+    }
+
+    /* REMOVE the top three from the heap*/
+    long long acc = 0;
+    for (int i = 0; i < 3; ++i) {
+        long long val = heap[0];
+        acc += val;
+
+        swap(&heap[heapsize], &heap[0]);
+        --heapsize;
+        int cur = 0;
+        while (cur * 2 <= heapsize) {
+            int child = cur * 2;
+            if (cur < heapsize && heap[child + 1] > heap[child]) {
+                ++child;
+            }
+
+            if (heap[cur] >= heap[child]) {
+                break;
+            }
+
+            swap(&heap[cur], &heap[child]);
+            cur = child;
+        }
+    }
+
+    fclose(fp);
+    printf("heap: %lld\n", acc);
 }

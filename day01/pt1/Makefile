@@ -1,13 +1,11 @@
 TARGET  := solve.out
 CC      := cc
 CFLAGS  := -Wall -Wpedantic -Wextra -O2
-OBJECTS := $(wildcard ../../includes/*.o)
-HEADERS := $(wildcard ../../includes/*.h)
 
 all: $(TARGET)
 
 $(TARGET): ./main.c
-	$(CC) $(OBJECTS) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
-	rm $(TARGET)
+	rm -rf $(TARGET)
