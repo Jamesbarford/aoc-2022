@@ -7,20 +7,6 @@
 
 static char crt_screen[CRT_ROWS][CRT_COLUMNS];
 
-int getCycleStrength(int cycle, int Xreg) {
-    switch (cycle) {
-        case 20:
-        case 60:
-        case 100:
-        case 140:
-        case 180:
-        case 220:
-            return cycle * Xreg;
-            break;
-    }
-    return 0;
-}
-
 void printGrid(void) {
     for (int y = 0; y < CRT_ROWS; ++y) {
         printf("[%d]", y);
@@ -34,14 +20,6 @@ void printGrid(void) {
 
 void plotOnGrid(int x, int y, char c) {
     crt_screen[y][x] = c;
-}
-
-void initGrid(void) {
-    for (int y = 0; y < CRT_ROWS; ++y) {
-        for (int x = 0; x < CRT_COLUMNS; ++x) {
-            plotOnGrid(x, y, ' ');
-        }
-    }
 }
 
 char getPixel(int x, int Xreg) {
@@ -58,7 +36,6 @@ int main(void) {
     int cycle = 0;
     int y = 0;
     int x = 0;
-    initGrid();
 
     while (fgets(buf, sizeof(buf), fp)) {
         int isaddx = strncasecmp(buf, "addx", 4) == 0;
