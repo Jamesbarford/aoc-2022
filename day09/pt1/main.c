@@ -6,7 +6,7 @@
 #define SET_SIZE (1 << 12)
 
 typedef struct sNode {
-    unsigned long coord[2];
+    long coord[2];
     struct sNode *next;
 } sNode;
 
@@ -16,12 +16,12 @@ typedef struct set {
 } set;
 
 /* really really bad */
-unsigned long hashfunc(unsigned long coord[2]) {
+long hashfunc(long coord[2]) {
     return (coord[X] + coord[Y]) & (SET_SIZE - 1);
 }
 
-int setGetIdx(set *s, unsigned long coord[2], int *has) {
-    unsigned long hash = hashfunc(coord);
+int setGetIdx(set *s, long coord[2], int *has) {
+    long hash = hashfunc(coord);
     sNode *sn = s->data[hash];
 
     *has = 0;
@@ -37,9 +37,9 @@ out:
     return hash;
 }
 
-void setAdd(set *s, unsigned long coord[2]) {
+void setAdd(set *s, long coord[2]) {
     int has = 0;
-    unsigned long hash = setGetIdx(s, coord, &has);
+    long hash = setGetIdx(s, coord, &has);
     if (has) {
         return;
     }
@@ -74,7 +74,7 @@ void setRelease(set *s) {
     }
 }
 
-void moveCoord(unsigned long coord[2], char dir) {
+void moveCoord(long coord[2], char dir) {
     switch (dir) {
         case 'U':
             --coord[Y];
@@ -98,12 +98,12 @@ void moveCoord(unsigned long coord[2], char dir) {
     }
 }
 
-void moveTo(unsigned long coord[2], unsigned long x, unsigned long y) {
+void moveTo(long coord[2], long x, long y) {
     coord[X] = x;
     coord[Y] = y;
 }
 
-int istouch(unsigned long head[2], unsigned long tail[2]) {
+int istouch(long head[2], long tail[2]) {
     if (head[X] == tail[X] && head[Y] + 1 == tail[Y]) {
         return 1;
     } else if (head[X] == tail[X] && head[Y] - 1 == tail[Y]) {
@@ -126,10 +126,10 @@ int istouch(unsigned long head[2], unsigned long tail[2]) {
     return 0;
 }
 
-void move(set *seen, char dir, int motion, unsigned long head[2],
-        unsigned long tail[2])
+void move(set *seen, char dir, int motion, long head[2],
+        long tail[2])
 {
-    unsigned long prev_head[2] = {0, 0};
+    long prev_head[2] = {0, 0};
 
     for (int i = 0; i < motion; ++i) {
         if (i != 0 && !istouch(head, tail)) {
@@ -146,13 +146,15 @@ void move(set *seen, char dir, int motion, unsigned long head[2],
         setAdd(seen, prev_head);
         moveTo(tail, prev_head[X], prev_head[Y]);
     }
+    printf("head: (%ld, %ld)\n", head[X], head[Y]);
+    printf("tail: (%ld, %ld)\n", tail[X], tail[Y]);
 }
 
 int main(void) {
-    FILE *fp = fopen("./input.txt", "r");
+    FILE *fp = fopen("./warmup.txt", "r");
     char buf[10] = {0};
-    unsigned long head[2] = {0, 0};
-    unsigned long tail[2] = {0, 0};
+    long head[2] = {0, 0};
+    long tail[2] = {0, 0};
     set *seen = setNew();
 
     setAdd(seen, tail);
