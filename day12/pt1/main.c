@@ -4,24 +4,16 @@
 #include <string.h>
 
 #define SET_SIZE (1 << 12)
-#define nullchar ('\0')
 
-static int directions[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
-
-void unpack(long coord, int *x, int *y) {
-    *x = (int)(coord >> 32l);
-    *y = (int)(coord & 0x7FFFFFFF);
-}
-
-long pack(int x, int y) {
-    long coord = 0;
-    coord |= y;
-    coord |= (long)x << 32l;
-    return coord;
-}
+static int directions[4][2] = {
+        {-1, 0},
+        {0, 1},
+        {1, 0},
+        {0, -1},
+};
 
 typedef struct lNode {
-    long value;
+    int x, y, depth;
     struct lNode *next;
 } lNode;
 
@@ -39,9 +31,11 @@ list *listNew(void) {
     return l;
 }
 
-void listAppend(list *l, int x, int y) {
+void listAppend(list *l, int x, int y, int depth) {
     lNode *ln = malloc(sizeof(lNode));
-    ln->value = pack(x, y);
+    ln->x = x;
+    ln->y = y;
+    ln->depth = depth;
     ln->next = NULL;
 
     if (l->root == NULL) {
@@ -54,17 +48,16 @@ void listAppend(list *l, int x, int y) {
     l->size++;
 }
 
-long listDequeue(list *l) {
+lNode *listDequeue(list *l) {
     if (l->size == 0) {
-        return -1;
+        return NULL;
     }
 
     lNode *rem = l->root;
-    long value = rem->value;
     l->root = rem->next;
-    free(rem);
     l->size--;
-    return value;
+    rem->next = NULL;
+    return rem;
 }
 
 void listRelease(list *l) {
@@ -80,91 +73,19 @@ void listRelease(list *l) {
     }
 }
 
-list *listClone(list *l) {
-    list *clone = malloc(sizeof(list));
+void listPrint(list *l) {
+    int len = l->size;
     lNode *ln = l->root;
-    int x, y;
-
     while (ln) {
-        unpack(ln->value, &x, &y);
-        listAppend(clone, x, y);
+        printf("(%d, %d)", ln->x, ln->y);
+        if (len - 1 != 0) {
+            printf("->");
+        }
+
+        --len;
         ln = ln->next;
     }
-    return clone;
-}
-
-typedef struct hNode {
-    int weight;
-    int vertex;
-} hNode;
-
-typedef struct heap {
-    int size;
-    hNode *slab[BUFSIZ];
-} heap;
-
-heap *heapNew(void) {
-    heap *h = malloc(sizeof(heap));
-    h->size = 0;
-    return h;
-}
-
-void heapswap(heap *h, int i, int j) {
-    hNode *tmp = h->slab[i];
-    h->slab[i] = h->slab[j];
-    h->slab[j] = tmp;
-}
-
-void heapifyUp(heap *h, int idx) {
-    int cur = idx;
-    while (cur && h->slab[cur / 2]->weight > h->slab[cur]->weight) {
-        int parent = cur / 2;
-        heapswap(h, parent, cur);
-        cur = parent;
-    }
-}
-
-void heapInsert(heap *h, int weight, int vertex) {
-    hNode *hn = malloc(sizeof(hNode));
-    hn->weight = weight;
-    hn->vertex = vertex;
-    h->slab[++h->size] = hn;
-    heapifyUp(h, h->size);
-}
-
-void heapifyDown(heap *h, int idx) {
-    int cur = idx;
-    while (cur * 2 <= h->size) {
-        int child = cur * 2;
-        if (cur < h->size &&
-                h->slab[child + 2]->weight < h->slab[child]->weight)
-        {
-            ++child;
-        }
-
-        if (h->slab[cur]->weight <= h->slab[child]->weight) {
-            return;
-        }
-
-        heapswap(h, cur, child);
-        cur = child;
-    }
-}
-
-void heapRemove(heap *h) {
-    if (h->size == 0) {
-        return;
-    }
-    heapswap(h, h->size, 0);
-    h->size--;
-    heapifyDown(h, 0);
-}
-
-hNode *heapMin(heap *h) {
-    if (h->size == 0) {
-        return NULL;
-    }
-    return h->slab[1];
+    printf("\n");
 }
 
 typedef struct grid {
@@ -173,8 +94,46 @@ typedef struct grid {
     char *buf;
 } grid;
 
+grid *gridNew(int bufsize) {
+    grid *g = malloc(sizeof(grid));
+    g->rows = 0;
+    g->columns = 0;
+    g->buf = calloc(bufsize, sizeof(char));
+    return g;
+}
+
+char gridGet(grid *g, int x, int y) {
+    int idx = x + y * g->columns;
+    if (x < 0 || x >= g->columns) {
+        return -1;
+    } else if (y < 0 || y >= g->rows) {
+        return -1;
+    }
+    return g->buf[idx];
+}
+
+int gridFind(grid *g, char c, int *dx, int *dy) {
+    for (int y = 0; y < g->rows; ++y) {
+        for (int x = 0; x < g->columns; ++x) {
+            if (g->buf[x + y * g->columns] == c) {
+                *dx = x;
+                *dy = y;
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+void gridRelease(grid *g) {
+    if (g) {
+        free(g->buf);
+        free(g);
+    }
+}
+
 typedef struct sNode {
-    long coord;
+    int x, y;
     struct sNode *next;
 } sNode;
 
@@ -183,25 +142,21 @@ typedef struct set {
     sNode *data[SET_SIZE];
 } set;
 
-/* really really bad */
-long hashfunc(long coord) {
-    return coord & (SET_SIZE - 1);
+long hashfunc(int x, int y) {
+    long hash = 0;
+    hash |= x;
+    hash |= (long)y << 32l;
+    return hash & (SET_SIZE - 1);
 }
 
-int setGetIdx(set *s, long coord, int *has) {
-    long hash = hashfunc(coord);
+int setGetIdx(set *s, int x, int y, int *has) {
+    long hash = hashfunc(x, y);
     sNode *sn = s->data[hash];
 
     *has = 0;
 
     while (sn) {
-        int x, y;
-        unpack(coord, &x, &y);
-
-        int snx, sny;
-        unpack(coord, &snx, &sny);
-
-        if (x == snx && y == sny) {
+        if (x == sn->x && y == sn->y) {
             *has = 1;
             goto out;
         }
@@ -213,19 +168,19 @@ out:
 
 int setHas(set *s, int x, int y) {
     int has = 0;
-    (void)setGetIdx(s, pack(x, y), &has);
+    (void)setGetIdx(s, x, y, &has);
     return has;
 }
 
 void setAdd(set *s, int x, int y) {
     int has = 0;
-    long coord = pack(x, y);
-    long hash = setGetIdx(s, coord, &has);
+    long hash = setGetIdx(s, x, y, &has);
     if (has) {
         return;
     }
     sNode *sn = malloc(sizeof(sNode));
-    sn->coord = coord;
+    sn->x = x;
+    sn->y = y;
     sn->next = s->data[hash];
     s->data[hash] = sn;
     s->size++;
@@ -256,15 +211,13 @@ void setRelease(set *s) {
 
 void setPrint(set *s) {
     printf("{");
-    int x, y;
     int len = s->size;
     for (int i = 0; i < s->size && len; ++i) {
         sNode *sn = s->data[i];
 
         while (sn) {
-            unpack(sn->coord, &x, &y);
             len--;
-            printf("(%d, %d)", x, y);
+            printf("(%d, %d)", sn->x, sn->y);
             if (len != 0) {
                 printf(", ");
             }
@@ -274,103 +227,71 @@ void setPrint(set *s) {
     printf("}\n");
 }
 
-grid *gridNew(int bufsize) {
-    grid *g = malloc(sizeof(grid));
-    g->rows = 0;
-    g->columns = 0;
-    g->buf = malloc(sizeof(char) * bufsize);
-    return g;
+int partOneCond(char height, char cur) {
+    return (height - cur) > 1;
 }
 
-static inline int canstep(int cur, int pos) {
-    int retval = 0;
-    if (cur + 1 == pos) {
-        retval = 1;
-    } else if (pos <= cur) {
-        retval = 1;
-    }
-    printf("cur: %c, pos: %c, can visit: %s\n", cur, pos, retval == 1 ? "true" : "false");
-    return retval;
+int partTwoCond(char height, char cur) {
+    return (height - cur) < -1;
 }
 
-long findEnd(grid *g, char end) {
-    long coord = 0l;
-
-    for (int y = 0; y < g->rows; ++y) {
-        for (int x = 0; x < g->columns; ++x) {
-            if (g->buf[x + y * g->columns] == end) {
-                coord = pack(x, y);
-                return coord;
-            }
-        }
-    }
-
-    return coord;
-}
-
-int solve(grid *g) {
-    int step_count = 0;
-    int x = 0;
-    int y = 0;
-    int steps = 0;
-
+int solve(grid *g, int start_x, int start_y, char end, int (*cond)(char, char)) {
+    int depth = 0;
+    lNode *ln = NULL;
     list *q = listNew();
     set *s = setNew();
+    
+    listAppend(q, start_x, start_y, depth);
 
-    int endx, endy;
-    unpack(findEnd(g, 'E'), &endx, &endy);
-    printf("endx: %d endy: %d\n", endx, endy);
+    while ((ln = listDequeue(q))) {
+        depth = ln->depth;
+        char cur = gridGet(g, ln->x, ln->y);
 
-    listAppend(q, x, y);
-    long coord;
-
-    while ((coord = listDequeue(q)) != -1) {
-        unpack(coord, &x, &y);
-        if (setHas(s, x, y)) continue;
-        setAdd(s, x, y);
-
-        char cur = g->buf[x + y * g->columns];
-        printf("(%d, %d) -> %c\n", x,y, cur);
-        if (cur == 'S') {
-            cur = 'a';
-        }
-
-        if (x == endx && y == endy) {
-            printf("done: %d\n", steps);
-            steps = 0;
-            continue;
+        if (cur == end) {
+            goto out;
         }
 
         for (int i = 0; i < 4; ++i) {
-            int next_X = x + directions[i][0];
-            int next_Y = y + directions[i][1];
+            int x2 = ln->x + directions[i][0];
+            int y2 = ln->y + directions[i][1];
+            char height = gridGet(g, x2, y2);
 
-            printf("(%d, %d) -> %c\n", next_X, next_Y, g->buf[next_X + next_Y * g->columns]);
-
-            if ((next_X >= 0 && next_X < g->columns) &&
-                    (next_Y >= 0 && next_Y < g->rows) &&
-                    canstep(cur, g->buf[next_X + next_Y * g->columns]))
-            {
-                printf("adding: (%d, %d)\n",next_X, next_Y);
-                listAppend(q, next_X, next_X);
+            if (height == 'E') {
+                height = 'z';
             }
+
+            if (height == -1) {
+                continue;
+            }
+
+            if (setHas(s, x2, y2)) {
+                continue;
+            }
+
+            if (cond(height, cur)) {
+                continue;
+            }
+
+            listAppend(q, x2, y2, depth + 1);
+            setAdd(s, x2, y2);
         }
-        steps++;
+        free(ln);
     }
-    setPrint(s);
 
-    printf("%d\n", steps);
+out:
+    setRelease(s);
+    listRelease(q);
 
-    return step_count;
+    return depth;
 }
 
 int main(void) {
-    FILE *fp = fopen("./warmup.txt", "r");
+    FILE *fp = fopen("./input.txt", "r");
     fseek(fp, 0, SEEK_END);
     size_t file_size = ftell(fp);
     fseek(fp, 0, SEEK_SET);
 
-    char tmp[BUFSIZ] = {nullchar};
+    char tmp[BUFSIZ];
     grid *g = gridNew(file_size);
     int buflen = 0;
 
@@ -388,14 +309,17 @@ int main(void) {
         g->rows++;
     }
 
-    for (int y = 0; y < g->rows; ++y) {
-        for (int x = 0; x < g->columns; ++x) {
-            printf("%c", g->buf[x + y * g->columns]);
-        }
-        printf("\n");
-    }
-
     fclose(fp);
-    solve(g);
+
+    int x, y;
+    gridFind(g, 'S', &x, &y);
+    g->buf[x+y*g->columns] = 'a';
+    printf("part1: %d\n", solve(g, x, y, 'E', partOneCond));
+
+    gridFind(g, 'E', &x, &y);
+    g->buf[x+y*g->columns] = 'z';
+    printf("part2: %d\n", solve(g, x, y, 'a', partTwoCond));
+
+    gridRelease(g);
     return 0;
 }
