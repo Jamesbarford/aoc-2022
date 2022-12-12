@@ -1,4 +1,4 @@
-CC := gcc-12
+CC := cc
 
 a.out: ./main.c
 	$(CC) -Wall -Wpedantic -Wextra -O2 -o $@ $^
