@@ -1,3 +1,7 @@
 *.o
 *.out
 *.dSYM
+*.json
+*.js
+node_modules
+*.lock
