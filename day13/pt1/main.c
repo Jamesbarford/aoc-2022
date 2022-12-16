@@ -8,14 +8,14 @@
 #define MAX_LIST (1 << 12)
 
 typedef struct lNode {
-    int val, depth;
+    int val;
+    void *ptr; /* points to a list */
     struct lNode *next;
 } lNode;
 
 /* FIFO QUEUE */
 typedef struct list {
     int size;
-    int depth;
     lNode *root;
     lNode *tail;
 } list;
@@ -24,15 +24,14 @@ list *listNew(void) {
     list *l = malloc(sizeof(list));
     l->root = l->tail = NULL;
     l->size = 0;
-    l->depth = 0;
     return l;
 }
 
-void listAppend(list *l, int val, int depth) {
+void listAppend(list *l, int val, void *ptr) {
     lNode *ln = malloc(sizeof(lNode));
     ln->val = val;
-    ln->depth = depth;
     ln->next = NULL;
+    ln->ptr = NULL;
 
     if (l->root == NULL) {
         l->root = l->tail = ln;
@@ -80,7 +79,7 @@ void listRelease(list *l) {
 void listPrint(list *l) {
     int len = l->size;
     lNode *ln = l->root;
-    printf("len: %d, depth: %d\n", l->size, l->depth);
+    printf("len: %d\n", l->size);
     printf("[");
     while (ln) {
         printf("%d", ln->val);
@@ -101,15 +100,6 @@ int listCmp(list **l1s, list **l2s) {
     for (int i = 0; i < MAX_LIST; ++i) {
         list *l1 = l1s[i];
         list *l2 = l2s[i];
-
-        if (l1->size == 0 && l2->size == 0 && l1->depth == l2->depth) {
-            continue;
-        }
-
-        if (l1->depth != l2->depth) {
-            retval = 0;
-            goto out;
-        }
 
         listPrint(l1);
         listPrint(l2);
@@ -138,19 +128,16 @@ out:
     return retval;
 }
 
-void parseToList(list **lists, char *ptr) {
-    int depth = -1;
+list *parseToList(list *l, char *ptr) {
     int tmp = 0;
-
+    ptr++; // pass first '[';
     while (*ptr) {
         switch (*ptr) {
             case '[':
-                depth++;
-                lists[depth]->depth = depth;
+//                lists[depth]->depth = depth;
                 break;
             case ']':
-                depth--;
-                lists[depth]->depth = depth;
+//                lists[depth]->depth = depth;
                 break;
             default:
                 if (isdigit(*ptr)) {
@@ -158,13 +145,15 @@ void parseToList(list **lists, char *ptr) {
                         tmp = tmp * 10 + toint(*ptr);
                         ++ptr;
                     }
-                    listAppend(lists[depth], tmp, depth);
+                    listAppend(l, tmp, NULL);
+//                    listAppend(lists[depth], tmp, depth);
                     tmp = 0;
                 }
                 break;
         }
         ++ptr;
     }
+    return l;
 }
 
 int main(void) {
