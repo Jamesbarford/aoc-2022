@@ -14,6 +14,10 @@ The focus is canonically correct answers; making the correct datastructure in `c
 | [9](https://adventofcode.com/2022/day/9) | ⭐️ | ⭐️ |
 | [10](https://adventofcode.com/2022/day/10) | ⭐️ | ⭐️ |
 | [11](https://adventofcode.com/2022/day/11) | ⭐️ | ⭐️ |
+| [12](https://adventofcode.com/2022/day/12) | ⭐️ | ⭐️ |
+| [13](https://adventofcode.com/2022/day/13) | ⭐️ | ⭐️ |
+| [14](https://adventofcode.com/2022/day/14) | ⭐️ | ⭐️ |
+| [15](https://adventofcode.com/2022/day/15) | ⭐️ | ⭐️ |
 
 ## Building 🎅🏻
 I am leaning on some things I've built (for reading in a file), which are in the includes folder. This needs to be built first so the solutions can link against it.
