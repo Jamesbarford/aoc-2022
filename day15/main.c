@@ -6,10 +6,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define MAX_BOUNDS 4000000
+
+int dir[][2] = {
+        {-1, -1},
+        {-1, 1},
+        {1, 1},
+        {1, -1},
+};
+
+typedef struct sensor {
+    int x, y;
+    int bx, by;
+    int mdistance;
+} sensor;
+
 typedef struct lNode {
-    int start, end;
+    int v1, v2;
     struct lNode *next;
 } lNode;
+
+typedef int(NodeCmp)(lNode *, lNode *);
 
 /* FIFO QUEUE */
 typedef struct list {
@@ -17,8 +34,6 @@ typedef struct list {
     lNode *root;
     lNode *tail;
 } list;
-
-typedef int(NodeCmp)(lNode *, lNode *);
 
 list *listNew(void) {
     list *l = malloc(sizeof(list));
@@ -29,8 +44,8 @@ list *listNew(void) {
 
 void listAppend(list *l, int start, int end) {
     lNode *ln = malloc(sizeof(lNode));
-    ln->start = start;
-    ln->end = end;
+    ln->v1 = start;
+    ln->v2 = end;
     ln->next = NULL;
 
     if (l->root == NULL) {
@@ -73,7 +88,7 @@ void listPrint(list *l) {
     lNode *ln = l->root;
     printf("[");
     while (ln && len) {
-        printf("(%d, %d)", ln->start, ln->end);
+        printf("(%d, %d)", ln->v1, ln->v2);
         if (len - 1 != 0) {
             printf(", ");
         }
@@ -84,21 +99,18 @@ void listPrint(list *l) {
     printf("]\n");
 }
 
-
 /* DESC: From high to low */
 int __lnode_cmp_LTE(lNode *n1, lNode *n2) {
-    return ((n1->start > n2->start) ||
-            ((n1->start == n2->start) && (n1->end > n2->end)));
+    return ((n1->v1 > n2->v1) || ((n1->v1 == n2->v1) && (n1->v2 > n2->v2)));
 }
 
 /* ASC: From low to high */
 int __lnode_cmp_GTE(lNode *n1, lNode *n2) {
-    return ((n1->start < n2->start) ||
-            ((n1->start == n2->start) && (n1->end < n2->end)));
+    return ((n1->v1 < n2->v1) || ((n1->v1 == n2->v1) && (n1->v2 < n2->v2)));
 }
 
 int __lnode_cmp_start_LTE(lNode *n1, lNode *n2) {
-    return n1->start <= n2->start;
+    return n1->v1 <= n2->v1;
 }
 
 void __swap(int *x, int *y) {
@@ -115,16 +127,16 @@ lNode *__list_pivot(lNode *head, lNode *tail, NodeCmp *node_cmp) {
         if (node_cmp(cursor, tail)) {
             pivot = head;
 
-            __swap(&head->start, &cursor->start);
-            __swap(&head->end, &cursor->end);
+            __swap(&head->v1, &cursor->v1);
+            __swap(&head->v2, &cursor->v2);
 
             head = head->next;
         }
         cursor = cursor->next;
     }
 
-    __swap(&head->start, &tail->start);
-    __swap(&head->end, &tail->end);
+    __swap(&head->v1, &tail->v1);
+    __swap(&head->v2, &tail->v2);
 
     return pivot;
 }
@@ -156,50 +168,20 @@ list *listUniqSort(list *l) {
     lNode *next = prev->next;
 
     while (next) {
-        if (prev->start != next->start && prev->end != next->end) {
-            listAppend(uniq,prev->start,prev->end);
+        if (prev->v1 != next->v1 && prev->v2 != next->v2) {
+            listAppend(uniq, prev->v1, prev->v2);
         }
         prev = next;
         next = next->next;
     }
 
-    if (uniq->tail->start != prev->start && uniq->tail->end != prev->end) {
-        listAppend(uniq,prev->start,prev->end);
+    if (uniq->tail->v1 != prev->v1 && uniq->tail->v2 != prev->v2) {
+        listAppend(uniq, prev->v1, prev->v2);
     }
-    listQsort(uniq,__lnode_cmp_GTE);
+    // listQsort(uniq, __lnode_cmp_GTE);
 
     return uniq;
 }
-
-int munchChar(char *ptr, char until) {
-    int offset = 0;
-    while (*ptr != until) {
-        ++ptr;
-        ++offset;
-    }
-    return offset;
-}
-
-int getNumber(char *ptr, int *output) {
-    int offset = 0;
-    int tmp_num = 0;
-    int is_minus = 0;
-    if (*ptr == '-') {
-        is_minus = 1;
-        ptr++;
-    }
-
-    while (isdigit(*ptr)) {
-        tmp_num = tmp_num * 10 + *ptr - 48;
-        ++ptr;
-        ++offset;
-    }
-
-    tmp_num = is_minus ? -1 * tmp_num : tmp_num;
-    *output = tmp_num;
-    return offset;
-}
-
 /*
  *
  *
@@ -235,13 +217,18 @@ int listHasOverlap(list *l) {
     lNode *ln2 = ln1->next;
 
     while (ln1 && ln2) {
-        if (ln1->start >= ln2->start && ln1->end <= ln2->end) {
+        int start = ln1->v1;
+        int end = ln1->v2;
+        int next_start = ln2->v1;
+        int next_end = ln2->v2;
+
+        if (start >= next_start && end <= next_end) {
             return 1;
-        } else if (ln1->start <= ln2->start && ln1->end >= ln2->end) {
+        } else if (start <= next_start && end >= next_end) {
             return 1;
-        } else if (ln1->start <= ln2->end && ln1->end >= ln2->end) {
+        } else if (start <= next_end && end >= next_end) {
             return 1;
-        } else if (ln1->start <= ln2->start && ln1->end >= ln2->start) {
+        } else if (start <= next_start && end >= next_start) {
             return 1;
         }
         ln2 = ln1;
@@ -257,47 +244,52 @@ list *listConsolidate(list *l) {
     list *aux = listNew();
     lNode *an;
     listQsort(l, __lnode_cmp_GTE);
-    listAppend(aux, ln->start, ln->end);
+    listAppend(aux, ln->v1, ln->v2);
 
     while (ln) {
         an = aux->root;
 
         // [(-189975, 5137544), (-83453, 1291977)]
         while (an) {
+            int start = ln->v1;
+            int end = ln->v2;
+            int cmp_start = an->v1;
+            int cmp_end = an->v2;
             /* Fully contained */
-            if (ln->start == ln->end) {
+            if (start == end) {
                 break;
             }
 
             /* Node is fully contained within current range, null it out*/
-            if (ln->start > an->start && ln->end < an->end) {
-                ln->start = ln->end;
+            if (start > cmp_start && end < cmp_end) {
+                ln->v1 = end;
                 break;
             }
 
             /* Expand `an` as it can absorb `ln`, null out ln */
-            if (ln->start <= an->start && ln->end >= an->end) {
-                an->start = ln->start;
-                an->end = ln->end;
-                ln->start = ln->end;
+            if (ln->v1 <= an->v1 && ln->v2 >= an->v2) {
+                an->v1 = ln->v1;
+                an->v2 = ln->v2;
+                ln->v1 = ln->v2;
                 break;
             }
 
-            /* If the end of the current node encroaches, then it's end = start - 1 */
-            if (ln->end >= an->start && ln->end <= an->end) {
-                ln->end -= an->start - 1;
+            /* If the end of the current node encroaches, then it's end = start
+             * - 1 */
+            if (end >= cmp_start && end <= cmp_end) {
+                ln->v2 -= an->v1 - 1;
             }
 
             /* start `ln` overlaps end of `an` then it's start = end + 1 */
-            if (ln->start <= an->end && ln->end > an->end) {
-                ln->start = an->end + 1;
+            if (start <= cmp_end && end > cmp_end) {
+                ln->v1 = an->v2 + 1;
             }
 
             an = an->next;
         }
 
-        if (ln->start != ln->end) {
-            listAppend(aux, ln->start, ln->end);
+        if (ln->v1 != ln->v2) {
+            listAppend(aux, ln->v1, ln->v2);
         }
 
         ln = ln->next;
@@ -305,6 +297,23 @@ list *listConsolidate(list *l) {
     listPrint(aux);
     listRelease(l);
     return aux;
+}
+
+int canfind(sensor *sensors, int sensor_count, int x, int y) {
+    int can_find = 0;
+    for (int i = 0; i < sensor_count; ++i) {
+        sensor *s = sensors + i;
+        if (s->bx == x && s->by == y) {
+            return 0;
+        }
+
+        if (manhattanDistance(x, s->x, y, s->y) <= s->mdistance) {
+            can_find = 1;
+            continue;
+        }
+    }
+
+    return can_find;
 }
 
 /*
@@ -330,7 +339,7 @@ int solution1(list *l, int beacon_count) {
 
     for (ln = l->root; ln != NULL; ln = ln->next) {
         int tmp = 0;
-        for (int i = ln->start; i <= ln->end; ++i) {
+        for (int i = ln->v1; i <= ln->v2; ++i) {
             tmp += 1;
         }
         acc += tmp;
@@ -345,6 +354,11 @@ int main(int argc, char **argv) {
         exit(1);
     }
     char *file_name = argv[1];
+
+    if (file_name[0] == '.' && file_name[1] == '/') {
+        file_name += 2;
+    }
+
     FILE *fp = fopen(file_name, "r");
     if (fp == NULL) {
         perror("Failed to open file");
@@ -352,9 +366,12 @@ int main(int argc, char **argv) {
     }
 
     char tmp[BUFSIZ];
-    int row_of_interest = (strncasecmp(file_name, "input.txt", 5)  ==0) ?  2000000 : 10;
+    int row_of_interest =
+            (strncasecmp(file_name, "input.txt", 5) == 0) ? 2000000 : 10;
     list *l = listNew();
     list *beacons = listNew();
+    int scount = 0;
+    sensor *sensors = malloc(sizeof(sensor) * 1000);
 
     while (fgets(tmp, sizeof(tmp), fp)) {
         size_t len = strlen(tmp);
@@ -364,60 +381,77 @@ int main(int argc, char **argv) {
             --len;
         }
 
-        /* point to first digit of x */
-        ptr += 12;
-        int x, y, x2, y2;
-        ptr += getNumber(ptr, &x);
-        ptr += munchChar(ptr, '=');
-        ptr++;
-        ptr += getNumber(ptr, &y);
-        ptr += munchChar(ptr, '=');
-        ptr++;
-        ptr += getNumber(ptr, &x2);
-        ptr += munchChar(ptr, '=');
-        ptr++;
-        ptr += getNumber(ptr, &y2);
+        sensor *s = &sensors[scount];
 
+        int x, y, x2, y2;
+        sscanf(tmp, "Sensor at x=%d, y=%d: closest beacon is at x=%d, y=%d", &x,
+                &y, &x2, &y2);
         int m_distance = manhattanDistance(x, x2, y, y2);
+        s->x = x;
+        s->y = y;
+        s->bx = x2;
+        s->by = y2;
+        s->mdistance = m_distance;
+        ++scount;
+
         int shift = calculateXShift(y, m_distance, row_of_interest);
         int S = x - shift;
         int F = x + shift;
 
+        /* for part 1*/
         int inrange = sensorInRange(y, row_of_interest, m_distance);
-
         if (inrange) {
             printf("S=%3d <> F=%3d sensor=(%3d, %3d) manhattan distance=%3d\n",
                     S, F, x, y, m_distance);
             listAppend(l, S, F);
-            listAppend(beacons, x2, y2);
         }
-        // printf("sensor: x=%d, y=%d, beacon: x=%d, y=%d\n", x, y, x2, y2);
-    }
 
-    printf("beacons: \n");
+        listAppend(beacons, x2, y2);
+    }
+    fclose(fp);
+    printf("sensor count: %d\n", scount);
+
     listQsort(beacons, __lnode_cmp_GTE);
-    listPrint(beacons);
-    
-    printf("uniq beacons: \n");
     list *uniq_beacons = listUniqSort(beacons);
-    listPrint(uniq_beacons);
 
     int beacon_count = 0;
     for (lNode *ln = uniq_beacons->root; ln != NULL; ln = ln->next) {
         /* end == y */
-        if (ln->end == row_of_interest) {
+        if (ln->v2 == row_of_interest) {
             beacon_count++;
         }
     }
 
+    printf("part1: %d\n", solution1(l, beacon_count));
 
-    printf("=====\n");
-    
-    printf("starts & ends: ");
-    listPrint(l);
-    printf("beacon_count: %d\n", beacon_count);
-    printf("part1 - alt: %d\n", solution1(l, beacon_count));
-    fclose(fp);
-    //printf("part1: %d\n", solve(l));
+    for (int i = 0; i < scount; ++i) {
+        sensor *s = &sensors[i];
+        int x = s->x;
+        int y = s->y;
+        int mdist = s->mdistance+1;
+        x += mdist;
+
+        for (int j = 0; j < 4; j++) {
+            for (int k = 0; k < mdist; k++) {
+                if (!canfind(sensors,scount,x,y) &&
+                        x >= 0 && x <= MAX_BOUNDS &&
+                        y >= 0 && y <= MAX_BOUNDS)
+                {
+                    printf("(%d, %d)\n", x, y);
+                    printf("part2: %ld\n", (long)MAX_BOUNDS * x + y);
+                    return 0;
+                }
+                if (k != mdist - 1) {
+                    x += dir[j][0];
+                    y += dir[j][1];
+                }
+            }
+        }
+    }
+    listRelease(uniq_beacons);
+    listRelease(beacons);
+    listRelease(l);
+    free(sensors);
+
     return 0;
 }
