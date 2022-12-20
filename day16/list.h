@@ -28,7 +28,6 @@ int listEQ(list *l1, list *l2);
 void listHeapSort(list *l);
 void listPrint(list *l);
 list **listGetAllCombinations(list *l, int combo_size, int rounds, int *actual);
-list **listGetAllPermutations(list *l, int batch_size, int rounds, int *size);
 void listRemove(list *l, long val);
 
 static int __lnode_cmp_LTE(lNode *n1, lNode *n2) {

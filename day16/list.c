@@ -281,45 +281,6 @@ list **listGetAllCombinations(list *l, int combo_size, int rounds, int *actual) 
     return lists;
 }
 
-list **listGetAllPermutations(list *l, int batch_size, int rounds, int *size) {
-    list **lists = malloc(sizeof(list *) * rounds);
-    long *arr = malloc(sizeof(long) * l->size);
-    int i = 0;
-    int tmp;
-    int count = 0;
-    *size = 0;
-
-    for (lNode *ln = l->root; ln != NULL; ln = ln->next) {
-        arr[i] = ln->val;
-        i++;
-    }
-
-    for (int j = 0; j < rounds; ++j) {
-        lists[j] = listNew();
-    }
-
-
-    for (int ii = 0; ii < l->size; ++ii) {
-        int current_batch = 0;
-        for (int j = 0; j < l->size-1 && count < rounds; ++j) {
-            tmp = arr[j];
-            arr[j] = arr[j+1];
-            arr[j+1] = tmp;
-            /* on every iteration create a list */
-            for (int kk = 0; kk < batch_size; ++kk) {
-                listAppend(lists[count],arr[kk]);
-            }
-            current_batch++;
-            count++;
-        }
-    }
-
-    *size = count;
-    
-    free(arr);
-    return lists;
-}
-
 void listRemove(list *l, long val) {
     lNode *cur = l->root;
     lNode *prev = NULL;
