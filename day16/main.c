@@ -14,10 +14,17 @@
 #define MAX_VALVES 60
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 
-typedef struct connections {
-    char *key;
-    int rate;
-} connections;
+typedef struct dist {
+    int name;
+    int distance;
+} dist;
+
+dist *distNew(int name, int distance) {
+    dist *d = malloc(sizeof(dist));
+    d->name = name;
+    d->distance = distance;
+    return d;
+}
 
 typedef struct valve {
     /* 4 bits in a char so this is excessive */
@@ -53,6 +60,7 @@ valve *valveFind(valve *valves, int count, int key) {
         }
     }
     return NULL;
+
 }
 
 void valvePrint(valve *v) {
@@ -81,15 +89,50 @@ void printint(int v) {
     printf("%d", v);
 }
 
+void printPathMapValue(void *ptr) {
+    long value = (long)ptr;
+    long distance = value >> 32l & 0x7FFFFFFF;
+    long flow = value & 0x7FFFFFFF;
+    printf(" => distance: %2ld flow: %2ld\n", distance, flow);
+}
+
+void printname(int name) {
+    printf("%c%c", name >> 8 & 0xFF, name & 0xFF);
+}
+
+void printnameKey(int name) {
+    printf("key: %c%c => ", name >> 8 & 0xFF, name & 0xFF);
+}
+
+mapType path_map = {
+    .freeValue = NULL,
+    .printValue = printPathMapValue,
+    .printKey = printname,
+};
+
+mapType cost_to_flow = {
+    .freeValue = (MapFree *)mapRelease,
+    .printValue = (MapPrintValue *)mapPrint,
+    .printKey = printnameKey,
+};
+
+mapType sub_cost_to_flow = {
+    .freeValue = NULL,
+    .printValue = (MapPrintValue *)mapPrint,
+    .printKey = printnameKey,
+};
+
 mapType int_map = {
         .freeValue = NULL,
         .printValue = NULL,
         .printKey = printint,
 };
 
-void printname(int name) {
-    printf("%c%c", name >> 8 & 0xFF, name & 0xFF);
-}
+mapType map_list = {
+    .freeValue = (MapFree *)listRelease,
+    .printValue = (MapPrintValue *)listPrint,
+    .printKey = printint,
+};
 
 int munchChar(char *ptr, char untill) {
     int offset = 0;
@@ -117,7 +160,6 @@ int __list_sort_firstchar(lNode *n1, lNode *n2) {
 }
 
 char *listToKey(list *l, int *len) {
-    // listQsort(l,__list_sort_firstchar);
     int cap = BUFSIZ;
     int size = 0;
     char *key = malloc(sizeof(char) * BUFSIZ);
@@ -127,8 +169,8 @@ char *listToKey(list *l, int *len) {
             cap *= cap;
             key = realloc(key, sizeof(char) * cap);
         }
-        size += snprintf(key + size, 4, "%c%c", ln->val >> 8 & 0xFF,
-                ln->val & 0xFF);
+        size += snprintf(key + size, 4, "%c%c", (char)ln->val >> 8 & 0xFF,
+                (char)ln->val & 0xFF);
     }
     *len = size;
     key[*len] = '\0';
@@ -160,11 +202,9 @@ int __driver(map *nodes, list *visited, hmap *cache, int run, int current,
     }
 
     int pressure = 0;
-    int found = 0;
 
     valve *v = mapGet(nodes, current);
     if (!listHas(visited, current) && v->rate > 0) {
-        found = 1;
         list *next_visited = listNew();
         for (lNode *ln = visited->root; ln != NULL; ln = ln->next) {
             listAppend(next_visited, ln->val);
@@ -199,13 +239,266 @@ int part1Solution(map *nodes, int current) {
     int answer = __driver(nodes, visited, cache, 0, current, 30);
     listRelease(visited);
     printf("cache: %d\n", cache->size);
-    printf("%d\n", answer);
+    printf("part1: %d\n", answer);
     return answer;
+}
+
+map *bfs(map *valves, int start) {
+    list *queue = listNew();
+    listAppend(queue, (long)start << 32l | 0);
+    lNode *ln;
+    map *path_costs = mapNew(&path_map);
+
+    while ((ln = listDequeue(queue))) {
+        int name = ln->val >> 32L & 0x7FFFFFFF;
+        int cost = ln->val & 0x7FFFFFFF;
+
+        valve *v = mapGet(valves, name);
+        /*
+        printname(name);
+        printf(" => %d\n", cost);
+        valvePrint(v);
+        printf("========\n");
+        */
+
+        /* store cost of getting to node along with the flow of that node */
+        long cost_flow_rate = (long)cost << 32l | v->rate;
+
+        mapAdd(path_costs,name,(void *)(long)cost_flow_rate);
+        for (int i = 0; i < v->count; ++i) {
+            if (!mapHas(path_costs,v->connections[i])) {
+                listAppend(queue, (long)v->connections[i] << 32l | cost + 1);
+            }
+        }
+        free(ln);
+    }
+    
+    /* Remove flows of 0 */
+    for (int i = 0; i < SLAB_SIZE; ++i) {
+        mNode *mn = path_costs->slab[i];
+        mNode *prev = NULL;
+
+        while (mn) {
+            if (((long)mn->value & 0x7FFFFFFF) == 0 && mn->key != start) {
+                if (prev) {
+                    prev->next = mn->next;
+                } else {
+                    path_costs->slab[i] = mn->next;
+                }
+                free(mn);
+                path_costs->len--;
+            }
+            mn=mn->next;
+        }
+    }
+    
+    listRelease(queue);
+    return path_costs;
+}
+
+/**
+ * 'CC' => {
+ *    'DD' => (long)<int>|<int>
+ * }
+ * distance => flow
+ */
+map *createGraph(map *valves) {
+    int len;
+    int *keys = mapKeys(valves, &len);
+    map *path_costs = mapNew(&cost_to_flow);
+
+    for (int i = 0; i < len; ++i) {
+        mapAdd(path_costs,keys[i],bfs(valves,keys[i]));
+        valve *v = mapGet(valves,keys[i]);
+
+        /* Mark for delete */
+        if (v->rate == 0 && v->name != ('A' << 8 | 'A')) {
+            keys[i] |= 10 << 16;
+        }
+    }
+
+    /* clean up */
+    for (int i = 0; i < len; ++i) {
+        if ((keys[i] >> 16 & 0xFF) == 10) {
+            mapDelete(path_costs, keys[i] & 0xFFFF);
+        }
+    }
+
+    free(keys);
+    return path_costs;
+}
+
+map *createFlows(map *m) {
+    map *flows = mapNew(&int_map);
+    for (int i = 0; i < SLAB_SIZE; ++i) {
+        mNode *mn = m->slab[i];
+        while (mn) {
+            valve *v = mn->value;
+            if (v && (v->rate > 0 || v->name == 0x4141)) {
+                mapAdd(flows,v->name,v);
+            }
+            mn = mn->next;
+        }
+    }
+    return flows;
+}
+
+typedef struct run {
+    long flow;
+    long minute;
+    long name;
+    list *visited;
+} run; 
+
+run *runNew(long flow, long minute, long name, list *visited) {
+    run *r = malloc(sizeof(run));
+    r->name = name;
+    r->flow = flow;
+    r->minute = minute;
+    r->visited = visited;
+    return r;
+}
+
+int runHas(run *r, long needle) {
+    return listHas(r->visited,needle);
+}
+
+void runRelease(run *r) {
+    if (r) {
+        listRelease(r->visited);
+        free(r);
+    }
+}
+
+int findMaxForGraph(map *path_costs, int minutes) {
+    int max_pressure = 0;
+    int start_key = ('A' << 8 | 'A');
+    int len;
+    list *queue = listNew();
+    run *r = runNew(0,0,start_key,listNew());
+
+    for (int i = 0; i < SLAB_SIZE; ++i) {
+        mNode *mn = path_costs->slab[i];
+        while(mn) {
+            if (mn->key != start_key) {
+                listAppend(r->visited,mn->key);
+            }
+            mn=mn->next;
+        }
+    }
+
+    listAppend(queue,(long)r);
+
+    lNode *cur = NULL;
+    while ((cur = listDequeue(queue)) != NULL) {
+        r = (run *)cur->val;
+        map *links = mapGet(path_costs,r->name);
+
+        for (lNode *ln = r->visited->root; ln != NULL; ln = ln->next) {
+            long cost_and_flow = (long)mapGet(links,ln->val);
+            long cost = cost_and_flow >> 32 & 0x7FFFFFFF;
+            long flow = cost_and_flow & 0x7FFFFFFF;
+            long new_flow = r->flow + flow * (minutes - r->minute - cost - 1);
+
+            if (cost >= minutes - r->minute) {
+                continue;
+            } else {
+                list *next_visited = listNew();
+
+                for (lNode *v = r->visited->root; v != NULL; v = v->next) {
+                    if (v->val != ln->val) {
+                        listAppend(next_visited,v->val);
+                    }
+                }
+                run *new_r = runNew(new_flow,r->minute+cost+1,ln->val,next_visited);
+                listAppend(queue,(long)new_r);
+
+                if (new_flow > max_pressure) {
+                    max_pressure = new_flow;
+                }
+            }
+
+        }
+        runRelease(r);
+    }
+    listRelease(queue);
+
+    return max_pressure;
+}
+
+int solvePartOne(map *path_costs) {
+    return findMaxForGraph(path_costs, 30);
+}
+
+int solvePart2FairlyQuickly(map *path_costs) {
+    int len;
+    int *keys = mapKeys(path_costs,&len);
+    list *keyslist = listNew();
+    printf("keys: ");
+    for (int i = 0; i < len; ++i) {
+        if (keys[i] != 0x4141) {
+            printf("%c%c, ",keys[i]>>8&0xFF, keys[i]&0xFF);
+            listAppend(keyslist,keys[i]);
+        }
+    }
+    printf("\n");
+
+
+    int actual = 0;
+    /* A silly amount of rounds */
+    listQsort(keyslist,__lnode_cmp_GTE);
+    list **my_goes = listGetAllCombinations(keyslist,len/2,30000,&actual);
+    list **elephant_goes = malloc(sizeof(list *) * actual);
+
+    for (int i = 0; i < actual; ++i) {
+        elephant_goes[i] = listCopy(keyslist);
+    }
+
+    printf("actual combos: %d\n", actual);
+
+    int pressure_max = 0;
+
+    /* Threading would halve the time this takes to run */
+    for (int i = 0; i < actual; ++i) {
+        list *turn = my_goes[i];
+        list *ele_turn = elephant_goes[i];
+
+        /* These map will not free, the child nodes */
+        map *mySubGraph = mapNew(&sub_cost_to_flow);
+        map *eleSubGraph = mapNew(&sub_cost_to_flow);
+
+        mapAdd(mySubGraph,0x4141,mapGet(path_costs,0x4141));
+        mapAdd(eleSubGraph,0x4141,mapGet(path_costs,0x4141));
+
+        for (lNode *ln = turn->root; ln != NULL; ln = ln->next) { 
+            listRemove(ele_turn,ln->val);
+            mapAdd(mySubGraph,ln->val,mapGet(path_costs,ln->val));
+        }
+
+        for (lNode *ln = ele_turn->root; ln != NULL; ln = ln->next) { 
+            mapAdd(eleSubGraph,ln->val,mapGet(path_costs,ln->val));
+        }
+
+        pressure_max = MAX(findMaxForGraph(mySubGraph,26) + findMaxForGraph(eleSubGraph,26),
+                    pressure_max);
+
+        mapRelease(mySubGraph);
+        mapRelease(eleSubGraph);
+    }
+
+    for (int i = 0; i < actual; ++i) {
+        listRelease(my_goes[i]);
+        listRelease(elephant_goes[i]);
+    }
+
+    listRelease(keyslist);
+    free(keys);
+    return pressure_max;
 }
 
 /* This is a maximum flow problem */
 int main(int argc, char **argv) {
-    char *file_name = argc == 2 ? argv[1] : "./warmup.txt";
+    char *file_name = argc == 2 ? argv[1] : "./input.txt";
     FILE *fp = fopen(file_name, "r");
     if (!fp) {
         perror("Failed to open file");
@@ -274,12 +567,16 @@ int main(int argc, char **argv) {
         mapAdd(vmap, v->name, v);
     }
 
-    int key = 0;
-    key |= 'A' << 8;
-    key |= 'A';
-    part1Solution(vmap, key);
-
     fclose(fp);
+    map *path_costs = createGraph(vmap);
+    int part1 = findMaxForGraph(path_costs,30);
+    int part2 = solvePart2FairlyQuickly(path_costs);
+    printf("part1: %d\n", part1);
+    printf("part2: %d\n", part2);
+
+    mapRelease(path_costs);
+    mapRelease(vmap);
+    
 
     return 0;
 }

@@ -127,38 +127,6 @@ void mapDelete(map *m, int key) {
     }
 }
 
-int __qs_pivot(int *arr, int high, int low) {
-    int pivot = arr[high];
-    int idx = low - 1;
-
-    for (int i = low; i < high; ++i) {
-        if (arr[i] <= pivot) {
-            ++idx;
-            int tmp = arr[i];
-            arr[i] = arr[idx];
-            arr[idx] = tmp;
-        }
-    }
-    ++idx;
-    arr[high] = arr[idx];
-    arr[idx] = pivot;
-    return idx;
-}
-
-void __qs(int *arr, int high, int low) {
-    if (low >= high) {
-        return;
-    }
-
-    int pidx = __qs_pivot(arr,high,low);
-    __qs(arr,pidx-1,low);
-    __qs(arr,high,pidx+1);
-}
-
-void quicksort(int *arr, int len) {
-    __qs(arr,len-1,0);
-}
-
 int *mapKeys(map *m, int *outlen) {
     int capacity = 100;
     int size = 0;
@@ -177,7 +145,6 @@ int *mapKeys(map *m, int *outlen) {
         }
     }
 
-    quicksort(keys,size);
     *outlen = size;
     return keys;
 }

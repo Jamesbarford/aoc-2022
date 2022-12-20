@@ -42,6 +42,7 @@ map *mapNew(mapType *type);
 void *mapGet(map *m, int key);
 int mapHas(map *s, int key);
 void mapAdd(map *m, int key, void *value);
+void mapDelete(map *m, int key);
 void mapClear(map *m);
 void mapRelease(map *m);
 void mapPrint(map *m);

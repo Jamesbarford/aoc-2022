@@ -1,6 +1,6 @@
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
 
 #include "list.h"
 
@@ -11,7 +11,7 @@ list *listNew(void) {
     return l;
 }
 
-void listAppend(list *l, int value) {
+void listAppend(list *l, long value) {
     lNode *ln = malloc(sizeof(lNode));
     ln->val = value;
     ln->next = NULL;
@@ -56,7 +56,7 @@ void listPrint(list *l) {
     lNode *ln = l->root;
     printf("[");
     while (ln && len) {
-        printf("%d", ln->val);
+        printf("%ld", ln->val);
         if (len - 1 != 0) {
             printf(", ");
         }
@@ -67,20 +67,8 @@ void listPrint(list *l) {
     printf("]\n");
 }
 
-
-/* DESC: From high to low 
-static int __lnode_cmp_LTE(lNode *n1, lNode *n2) {
-    return (n1->val >= n2->val);
-}
-*/
-
-/* ASC: From low to high */
-static int __lnode_cmp_GTE(lNode *n1, lNode *n2) {
-    return (n1->val <= n2->val);
-}
-
-static void __swap(int *x, int *y) {
-    int tmp = *x;
+static void __swap(long *x, long *y) {
+    long tmp = *x;
     *x = *y;
     *y = tmp;
 }
@@ -124,27 +112,27 @@ void listQsort(list *l, NodeCmp *node_cmp) {
     __list_qsort(l->root, l->tail, node_cmp);
 }
 
-void __intswap(int *i, int *j) {
-    int tmp = *i;
+void __longswap(long *i, long *j) {
+    long tmp = *i;
     *i = *j;
     *j = tmp;
 }
 
 void listHeapSort(list *l) {
-    int *heap = malloc(l->size*sizeof(int));
-    for (int i = 0; i < l->size;++i) {
-        heap[i] = INT_MAX;
+    long *heap = malloc(l->size * sizeof(int));
+    for (long i = 0; i < l->size; ++i) {
+        heap[i] = LONG_MAX;
     }
-    int heap_size = 0;
+    long heap_size = 0;
     lNode *ln = NULL;
 
     /* Fill the heap */
     while ((ln = listDequeue(l))) {
         heap[++heap_size] = ln->val;
-        int cur = heap_size;
-        while (cur && heap[cur/2] > heap[cur]) {
-            int parent = cur/2;
-            __intswap(&heap[parent], &heap[cur]);
+        long cur = heap_size;
+        while (cur && heap[cur / 2] > heap[cur]) {
+            long parent = cur / 2;
+            __longswap(&heap[parent], &heap[cur]);
             cur = parent;
         }
         free(ln);
@@ -152,21 +140,21 @@ void listHeapSort(list *l) {
 
     /* Fill list */
     while (heap_size > 0) {
-        int min = heap[0];
+        long min = heap[0];
         listAppend(l, min);
-        __intswap(&heap[0], &heap[heap_size]);
+        __longswap(&heap[0], &heap[heap_size]);
         --heap_size;
-        int cur = 0;
-        while (cur*2 <= heap_size) {
-            int child = cur * 2;
-            if (child < heap_size && heap[child+1] < heap[child]) {
+        long cur = 0;
+        while (cur * 2 <= heap_size) {
+            long child = cur * 2;
+            if (child < heap_size && heap[child + 1] < heap[child]) {
                 ++child;
             }
 
             if (heap[cur] <= heap[child]) {
                 break;
             }
-            __intswap(&heap[child], &heap[cur]);
+            __longswap(&heap[child], &heap[cur]);
             cur = child;
         }
     }
@@ -204,7 +192,7 @@ list *listUniqSort(list *l, NodeCmp *node_cmp) {
     return uniq;
 }
 
-int listHas(list *l, int value) {
+int listHas(list *l, long value) {
     for (lNode *ln = l->root; ln != NULL; ln = ln->next) {
         if (ln->val == value) {
             return 1;
@@ -234,4 +222,121 @@ int listEQ(list *l1, list *l2) {
     }
 
     return n1 == NULL && n2 == NULL;
+}
+
+list *listCopy(list *l) {
+    list *copy = listNew();
+
+    for (lNode *ln = l->root; ln != NULL; ln = ln->next) {
+        listAppend(copy, ln->val);
+    }
+
+    return copy;
+}
+
+/* Will go for `n` rounds */
+void listCombinationUtil(long *arr, int len, int combo_size, list **lists,
+        long *data, int start, int end, int idx, int *iter, int rounds)
+{
+    if (idx == combo_size) {
+        if (*iter == rounds) return;
+        for (int j = 0; j < combo_size; ++j) {
+            listAppend(lists[*iter], data[j]);
+        }
+        *iter = *iter + 1;
+        return;
+    }
+
+    if (*iter == rounds) return;
+
+    for (int i = start; i <= end && end - i + 1 >= combo_size - idx; ++i) {
+        data[idx] = arr[i];
+        listCombinationUtil(arr,len,combo_size,lists,data,i+1,end,idx+1,iter,rounds);
+    }
+}
+
+list **listGetAllCombinations(list *l, int combo_size, int rounds, int *actual) {
+    list **lists = malloc(sizeof(list *) * rounds);
+    long *arr = malloc(sizeof(long) * l->size);
+    long *data = malloc(sizeof(long) * combo_size+1);
+
+    int i = 0;
+    for (lNode *ln = l->root; ln != NULL; ln = ln->next) {
+        arr[i] = ln->val;
+        i++;
+    }
+    for (int ii = 0; ii < l->size; ++ii) {
+        printf("%ld ", arr[ii]);
+    }
+    printf("\n");
+    for (int j = 0; j < rounds; ++j) {
+        lists[j] = listNew();
+    }
+
+    *actual = 0;
+    listCombinationUtil(arr,l->size,combo_size,lists,data,0,l->size-1,0,actual,rounds);
+
+    free(arr);
+    free(data);
+    return lists;
+}
+
+list **listGetAllPermutations(list *l, int batch_size, int rounds, int *size) {
+    list **lists = malloc(sizeof(list *) * rounds);
+    long *arr = malloc(sizeof(long) * l->size);
+    int i = 0;
+    int tmp;
+    int count = 0;
+    *size = 0;
+
+    for (lNode *ln = l->root; ln != NULL; ln = ln->next) {
+        arr[i] = ln->val;
+        i++;
+    }
+
+    for (int j = 0; j < rounds; ++j) {
+        lists[j] = listNew();
+    }
+
+
+    for (int ii = 0; ii < l->size; ++ii) {
+        int current_batch = 0;
+        for (int j = 0; j < l->size-1 && count < rounds; ++j) {
+            tmp = arr[j];
+            arr[j] = arr[j+1];
+            arr[j+1] = tmp;
+            /* on every iteration create a list */
+            for (int kk = 0; kk < batch_size; ++kk) {
+                listAppend(lists[count],arr[kk]);
+            }
+            current_batch++;
+            count++;
+        }
+    }
+
+    *size = count;
+    
+    free(arr);
+    return lists;
+}
+
+void listRemove(list *l, long val) {
+    lNode *cur = l->root;
+    lNode *prev = NULL;
+
+    while (cur) {
+        if (cur->val == val) {
+            if (prev) {
+                prev->next = cur->next;
+            } else {
+                l->root = cur->next;
+            }
+            free(cur);
+            l->size--;
+            return;
+        }
+
+        prev = cur;
+        cur = cur->next;
+    }
 }
